@@ -1,7 +1,12 @@
 #### 简答题
 
-1. 如何去测试这几个？？？
+1. sbi: RustSBI-QEMU Version 0.2.0-alpha.2
+
+   IllegalInstruction in application, kernel killed it
+
+   访问到非法指令以及非法地址了
 2. `__alltraps` 和 `__restore` 的作用
+
    1. a0表示TrapContext的地址，也就是要加载到寄存器中的内容。
       __restore使用场景：
       + 在trap控制流中，此时位于S态，需要恢复之前暂存的U态的数据。

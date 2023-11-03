@@ -14,9 +14,11 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM, CH2_SYSCALL_NUM};
+use crate::syscall::SYSCALL_MAP;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -54,6 +56,8 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            start_time: -1,
+            syscalls_cnt: [0; CH2_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -80,6 +84,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
+        task0.start_time = get_time_ms() as isize;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -102,6 +107,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Exited;
+        inner.tasks[current].start_time = -1;
     }
 
     /// Find next task to run and return task id.
@@ -121,6 +127,9 @@ impl TaskManager {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
+            if inner.tasks[next].start_time < 0 {
+                inner.tasks[next].start_time = get_time_ms() as isize;
+            }
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
@@ -168,4 +177,30 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// 获取当前正在运行的任务的已经运行的时长
+pub fn get_current_running_time(now_time: usize) -> usize {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let curr = inner.current_task;
+    // println!("in trap: {} {} {}", now_time, inner.tasks[curr].start_time, (now_time - inner.tasks[curr].start_time as usize) / 1000);
+    (now_time - inner.tasks[curr].start_time as usize + 1000 - 1) / 1000
+}
+
+/// 增加当前所发起的系统调用的次数
+pub fn add_current_curr_syscall_time(syscall_id: usize) {
+    let idx = (0..CH2_SYSCALL_NUM)
+        .find(|id| SYSCALL_MAP[*id] == syscall_id)
+        .unwrap();
+    
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let curr = inner.current_task;
+    inner.tasks[curr].syscalls_cnt[idx] += 1;
+}
+
+/// 获取当前任务的系统调用次数
+pub fn get_current_syscall_times() -> [u32; CH2_SYSCALL_NUM]{
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let curr = inner.current_task;
+    inner.tasks[curr].syscalls_cnt
 }

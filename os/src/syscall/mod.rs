@@ -10,6 +10,8 @@
 //! `sys_` then the name of the syscall. You can find functions like this in
 //! submodules, and you should also implement syscalls this way.
 
+use crate::config::CH2_SYSCALL_NUM;
+
 /// write syscall
 const SYSCALL_WRITE: usize = 64;
 /// exit syscall
@@ -20,6 +22,14 @@ const SYSCALL_YIELD: usize = 124;
 const SYSCALL_GET_TIME: usize = 169;
 /// taskinfo syscall
 const SYSCALL_TASK_INFO: usize = 410;
+/// SYSCALL-id 和 tasks桶id的映射    这个是通过和群友交流才意识到的
+pub const SYSCALL_MAP: [usize; CH2_SYSCALL_NUM] = [
+    SYSCALL_WRITE,
+    SYSCALL_EXIT,
+    SYSCALL_YIELD,
+    SYSCALL_GET_TIME,
+    SYSCALL_TASK_INFO,
+];
 
 mod fs;
 mod process;

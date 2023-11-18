@@ -213,3 +213,11 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .unwrap()
         .get_mut()
 }
+/// 判断某个ppn是否已经映射了
+pub fn is_map_vpn(token: usize, vpn: VirtPageNum) -> bool {
+    let page_table = PageTable::from_token(token);
+    match page_table.find_pte(vpn) {
+        Some(_pte) => true,
+        None => false,
+    }
+}

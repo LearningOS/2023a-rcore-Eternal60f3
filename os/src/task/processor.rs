@@ -146,7 +146,7 @@ pub fn add_maparea(start_va: VirtAddr, end_va: VirtAddr, perm: usize) {
 
 /// 删除当前进程中的一段内存
 ///     当前写法存在问题，只有当要删除的这段内存恰好和之前分配的某一段MapArea匹配时才会删除
-pub fn remove_mem(start_va: VirtAddr, _end_va: VirtAddr) -> isize {
+pub fn remove_mem(start_va: VirtAddr, end_va: VirtAddr) -> isize {
     let curr_task = current_task().unwrap();
     let mut task_inner = curr_task.inner_exclusive_access();
     task_inner.memory_set.remove_area(start_va, end_va)

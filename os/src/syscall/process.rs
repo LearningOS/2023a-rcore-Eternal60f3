@@ -211,8 +211,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
         curr_vpn.step();
     }
 
-    remove_mem(start_va, end_va);
-    0    
+    remove_mem(start_va, end_va)
 }
 
 /// change data segment size

@@ -22,6 +22,7 @@ bitflags! {
         const G = 1 << 5;
         /// a
         const A = 1 << 6;
+        /// d
         const D = 1 << 7;
     }
 }

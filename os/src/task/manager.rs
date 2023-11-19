@@ -28,7 +28,7 @@ impl TaskManager {
             return None;
         }
 
-        let mut min_task = (0, u8::MAX);
+        let mut min_task = (0, isize::MAX);
         for (id, task) in self.ready_queue.iter().enumerate() {
             let task_inner = task.inner_exclusive_access();
             if task_inner.stride < min_task.1 {
@@ -38,6 +38,7 @@ impl TaskManager {
 
         let task = self.ready_queue[min_task.0].clone();
         self.ready_queue.remove(min_task.0);
+        println!("{}", self.ready_queue.is_empty());
         Some(task)   
     }
 }

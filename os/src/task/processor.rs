@@ -9,14 +9,14 @@ use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
 use crate::mm::{VirtPageNum, is_map_vpn, MapPermission, VirtAddr, translated_refmut};
 use crate::sync::UPSafeCell;
-use crate::syscall::CH5_SYSCALL_CNT;
+use crate::syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL};
 use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
 
 /// 用于计算进程每一次运行后需要增加的pass
-const BIG_STRIDER: u8 = 255;
+const BIG_STRIDER: isize = 10000;
 
 /// Processor management structure
 pub struct Processor {
@@ -64,6 +64,7 @@ pub fn run_tasks() {
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
+            println!("now_task_pid: {}", task.pid.0);
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
@@ -159,12 +160,11 @@ pub fn curr_translate_refmut<T>(ptr: *mut T) -> &'static mut T {
 }
 
 /// 获取当前进程运行时间 
-pub fn get_current_running_time() -> usize {
+pub fn get_current_running_time(now_time: usize) -> usize {
     let curr_task = current_task().unwrap();
     let task_inner = curr_task.inner_exclusive_access();
 
-    let now_time = get_time_ms();
-    (now_time - task_inner.start_time as usize + 1000 - 1) / 1000
+    now_time - task_inner.start_time as usize + 100
 }
 
 /// 获取当前进程系统调用次数的桶
@@ -180,7 +180,7 @@ pub fn add_current_syscall_cnt(curr_syscall_id: usize) {
     let curr_task = current_task().unwrap();
     let mut task_inner = curr_task.inner_exclusive_access();
 
-    let pair = task_inner.tong_syscalls_cnt
+    let pair = TONG_MAP_SYSCALL
         .iter()
         .enumerate()
         .find(|(_, syscall_id)| {

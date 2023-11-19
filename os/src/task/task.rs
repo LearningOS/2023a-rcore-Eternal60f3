@@ -71,10 +71,10 @@ pub struct TaskControlBlockInner {
     pub program_brk: usize,
 
     /// 优先级
-    pub prio_level: u8,
+    pub prio_level: isize,
 
     /// 进程已运行的长度
-    pub stride: u8,
+    pub stride: isize,
 
     /// 进程开始运行的时间
     pub start_time: isize, 
@@ -167,6 +167,14 @@ impl TaskControlBlock {
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize base_size
         inner.base_size = user_sp;
+        // 初始化优先级
+        inner.prio_level = 16;
+        // 初始化stride
+        inner.stride = 0;
+        // 初始化时间
+        inner.start_time = -1;
+        // 初始化系统调用
+        inner.tong_syscalls_cnt = [0; CH5_SYSCALL_CNT];
         // initialize trap_cx
         let trap_cx = inner.get_trap_cx();
         *trap_cx = TrapContext::app_init_context(

@@ -10,7 +10,8 @@ use crate::{
         suspend_current_and_run_next, TaskStatus, is_map_vpn_current, add_maparea,
         remove_mem,  curr_translate_refmut, get_current_running_time, get_current_syscalls_cnt,
     },
-    timer::get_time_ms, syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL},
+    timer::{get_time_ms, get_time_us},
+    syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL},
 };
 
 #[repr(C)]
@@ -125,7 +126,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
         current_task().unwrap().pid.0
     );
 
-    let us = get_time_ms();
+    let us = get_time_us();
     let ts_ref = curr_translate_refmut(ts);
     ts_ref.sec = us / 1_000_000;
     ts_ref.usec = us % 1_000_000;
@@ -142,7 +143,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     );
     
     let ti_ref = curr_translate_refmut(ti);
-    ti_ref.time = get_current_running_time();
+    ti_ref.time = get_current_running_time(get_time_ms());
     ti_ref.status = TaskStatus::Running;
     let tong_syscalls_cnt = get_current_syscalls_cnt();
     for id in 0..CH5_SYSCALL_CNT {
@@ -262,6 +263,6 @@ pub fn sys_set_priority(prio: isize) -> isize {
     
     let task = current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access();
-    task_inner.prio_level = prio as u8;
+    task_inner.prio_level = prio;
     prio
 }

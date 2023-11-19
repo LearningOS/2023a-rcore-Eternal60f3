@@ -16,7 +16,10 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
+use crate::syscall::CH4_SYSCALL_CNT;
+use crate::mm::{translated_refmut, is_map_vpn, MapPermission};
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
@@ -79,6 +82,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
+        next_task.start_time = get_time_us() as isize;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -140,6 +144,9 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            if inner.tasks[next].start_time < 0 {
+                inner.tasks[next].start_time = get_time_us();
+            }   
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
@@ -201,4 +208,75 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// 获取当前进程虚拟地址所指的变量的在实际物理地址的引用
+pub fn curr_translate_refmut<T>(ptr: *mut T) -> &'static mut T {
+    let token = current_user_token();
+    translated_refmut(token, ptr)
+}
+
+/// 获取当前进程运行时间 
+pub fn get_current_running_time() -> usize {
+    let task_manager_inner = TASK_MANAGER.inner.exclusive_access();
+    let curr_task = task_manager_inner.tasks[task_manager_inner.current_task];
+
+    let now_time = get_time_us();
+    (now_time - curr_task.start_time as usize + 1000 - 1) / 1000
+}
+
+/// 获取当前进程系统调用次数的桶
+pub fn get_current_syscalls_cnt() -> [usize; CH4_SYSCALL_CNT] {
+    let task_manager_inner = TASK_MANAGER.inner.exclusive_access();
+    let curr_task = task_manager_inner.tasks[task_manager_inner.current_task];
+
+    curr_task.tong_syscalls_cnt
+}
+
+/// 增加当前进程当前使用的系统调用的次数 
+pub fn add_current_syscall_cnt(curr_syscall_id: usize) {
+    let mut task_manager_inner = TASK_MANAGER.inner.exclusive_access();
+    let curr_task = &mut task_manager_inner.tasks[task_manager_inner.current_task];
+
+    let pair = curr_task.tong_syscalls_cnt
+        .iter()
+        .enumerate()
+        .find(|(_, syscall_id)| {
+        **syscall_id == curr_syscall_id
+    });
+    if let Some((tong_id, _)) = pair {
+        curr_task.tong_syscalls_cnt[tong_id] += 1;
+    }
+}
+
+/// 在当前进程中判断某个虚拟页面是否已经映射了
+pub fn is_map_vpn_current(vpn: VirtPageNum) -> bool {
+    let token = current_user_token();
+    is_map_vpn(token, vpn)
+}
+
+/// 为当前进程增加一段内存(MapArea)
+pub fn add_maparea(start_va: VirtAddr, end_va: VirtAddr, perm: usize) {
+    let mut permission: MapPermission = MapPermission::U;
+    if (perm & (1 << 0)) != 0 {
+        permission.insert(MapPermission::R);
+    }
+    if (perm & (1 << 1)) != 0 {
+        permission.insert(MapPermission::W);
+    }
+    if (perm & (1 << 2)) != 0 {
+        permission.insert(MapPermission::X);
+    }
+
+    let mut task_manager_inner = TASK_MANAGER.inner.exclusive_access();
+    let curr_task = &mut task_manager_inner.tasks[task_manager_inner.current_task];
+    curr_task.memory_set.insert_framed_area(start_va, end_va, permission);
+}
+
+/// 删除当前进程中的一段内存
+///     当前写法存在问题，只有当要删除的这段内存恰好和之前分配的某一段MapArea匹配时才会删除
+pub fn remove_mem(start_va: VirtAddr, end_va: VirtAddr) -> isize {
+    let mut task_manager_inner = TASK_MANAGER.inner.exclusive_access();
+    let curr_task = &mut task_manager_inner.tasks[task_manager_inner.current_task];
+    curr_task.memory_set.remove_area(start_va, end_va)
 }

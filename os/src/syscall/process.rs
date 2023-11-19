@@ -3,7 +3,11 @@ use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
+        curr_translate_refmut, get_current_running_time, get_current_syscalls_cnt, is_map_vpn_current,
+        remove_mem,
     },
+    timer::get_time_us,
+    mm::{translated_refmut, VirtAddr, VirtPageNum, StepByOne},
 };
 
 #[repr(C)]
@@ -41,29 +45,86 @@ pub fn sys_yield() -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+
+    let us = get_time_us();
+    let ts_ref = curr_translate_refmut(ts);
+    ts_ref.sec = us / 1_000_000;
+    ts_ref.usec = us % 1_000_000;
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+    trace!("kernel: sys_task_info");
+    
+    let ti_ref = curr_translate_refmut(ti);
+    ti_ref.time = get_current_running_time();
+    ti_ref.status = TaskStatus::Running;
+    let tong_syscalls_cnt = get_current_syscalls_cnt();
+    for id in 0..CH5_SYSCALL_CNT {
+        ti_ref.syscall_times[TONG_MAP_SYSCALL[id]] = tong_syscalls_cnt[id] as u32;
+    }
+    0
 }
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_mmap");
+    
+    if start % PAGE_SIZE != 0 || (port & !0x7) != 0 || (port & 0x7) == 0 {
+        return -1;
+    }
+
+    let start_va: VirtAddr = start.into();
+    let end_va: VirtAddr = (start + len).into();
+    
+    let start_vpn: VirtPageNum = start_va.into();
+    let end_vpn: VirtPageNum = end_va.ceil().into();
+    let mut curr_vpn:VirtPageNum = start_vpn;
+    loop {
+        if curr_vpn == end_vpn {
+            break;
+        }
+        if is_map_vpn_current(curr_vpn) {
+            return -1;
+        }
+        curr_vpn.step();
+    }
+
+    add_maparea(start_va, end_va, port);
+    // 对于物理内存不足的情况，就直接靠系统panic
+    0
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_munmap");
+    
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    let start_va: VirtAddr = start.into();
+    let end_va: VirtAddr = (start + len).into();
+    
+    let start_vpn: VirtPageNum = start_va.into();
+    let end_vpn: VirtPageNum = end_va.ceil().into();
+    let mut curr_vpn:VirtPageNum = start_vpn;
+    loop {
+        if curr_vpn == end_vpn {
+            break;
+        }
+        if !is_map_vpn_current(curr_vpn) {
+            return -1;
+        }
+        curr_vpn.step();
+    }
+
+    remove_mem(start_va, end_va)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

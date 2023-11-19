@@ -5,6 +5,7 @@ use crate::mm::{
     kernel_stack_position, MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE,
 };
 use crate::trap::{trap_handler, TrapContext};
+use crate::syscall::CH4_SYSCALL_CNT;
 
 /// The task control block (TCB) of a task.
 pub struct TaskControlBlock {
@@ -28,6 +29,12 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    /// 进程开始运行的时间
+    pub start_time: isize,
+
+    /// 进程调用的系统调用的次数
+    pub tong_syscalls_cnt: [usize; CH4_SYSCALL_CNT],
 }
 
 impl TaskControlBlock {
@@ -63,6 +70,8 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            start_time: -1,
+            tong_syscalls_cnt: [0; CH4_SYSCALL_CNT],
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();

@@ -25,6 +25,20 @@ const SYSCALL_MMAP: usize = 222;
 /// taskinfo syscall
 const SYSCALL_TASK_INFO: usize = 410;
 
+/// CH4分支的syscall数量
+pub const CH4_SYSCALL_CNT: usize = 8;
+/// 对CH5的所有系统调用进行桶映射
+pub const TONG_MAP_SYSCALL: [usize; 8] = [
+    SYSCALL_WRITE,
+    SYSCALL_EXIT,
+    SYSCALL_YIELD,
+    SYSCALL_GET_TIME,
+    SYSCALL_SBRK,
+    SYSCALL_MUNMAP,
+    SYSCALL_MMAP,
+    SYSCALL_TASK_INFO,
+];
+
 mod fs;
 mod process;
 

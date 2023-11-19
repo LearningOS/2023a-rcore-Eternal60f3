@@ -205,7 +205,9 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
 pub fn is_map_vpn(token: usize, vpn: VirtPageNum) -> bool {
     let page_table = PageTable::from_token(token);
     match page_table.find_pte(vpn) {
-        Some(_pte) => true,
+        Some(pte) => {
+            (pte.flags() & PTEFlags::U) != PTEFlags::empty()
+        },
         None => false,
     }
 }

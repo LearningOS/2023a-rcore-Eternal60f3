@@ -18,7 +18,7 @@ use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
-use crate::syscall::CH4_SYSCALL_CNT;
+use crate::syscall::{CH4_SYSCALL_CNT, TONG_MAP_SYSCALL};
 use crate::mm::{translated_refmut, is_map_vpn, MapPermission, VirtAddr, VirtPageNum};
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -105,6 +105,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let cur = inner.current_task;
         inner.tasks[cur].task_status = TaskStatus::Exited;
+        inner.tasks[cur].start_time = -1;
     }
 
     /// Find next task to run and return task id.
@@ -217,12 +218,11 @@ pub fn curr_translate_refmut<T>(ptr: *mut T) -> &'static mut T {
 }
 
 /// 获取当前进程运行时间 
-pub fn get_current_running_time() -> usize {
+pub fn get_current_running_time(now_time: usize) -> usize {
     let task_manager_inner = TASK_MANAGER.inner.exclusive_access();
     let curr_task = &task_manager_inner.tasks[task_manager_inner.current_task];
 
-    let now_time = get_time_ms();
-    (now_time - curr_task.start_time as usize + 1000 - 1) / 1000
+    now_time - curr_task.start_time as usize + 100
 }
 
 /// 获取当前进程系统调用次数的桶
@@ -239,11 +239,11 @@ pub fn add_current_syscall_cnt(curr_syscall_id: usize) {
     let curr_task_idx = task_manager_inner.current_task;
     let curr_task = &mut task_manager_inner.tasks[curr_task_idx];
 
-    let pair = curr_task.tong_syscalls_cnt
+    let pair = TONG_MAP_SYSCALL
         .iter()
         .enumerate()
         .find(|(_, syscall_id)| {
-        **syscall_id == curr_syscall_id
+            **syscall_id == curr_syscall_id
     });
     if let Some((tong_id, _)) = pair {
         curr_task.tong_syscalls_cnt[tong_id] += 1;

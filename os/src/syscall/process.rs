@@ -6,7 +6,7 @@ use crate::{
         curr_translate_refmut, get_current_running_time, get_current_syscalls_cnt, is_map_vpn_current,
         remove_mem, add_maparea,
     },
-    timer::get_time_ms,
+    timer::{get_time_us, get_time_ms,},
     mm::{VirtAddr, VirtPageNum, StepByOne},
 };
 use super::{CH4_SYSCALL_CNT, TONG_MAP_SYSCALL};
@@ -49,7 +49,7 @@ pub fn sys_yield() -> isize {
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
 
-    let us = get_time_ms();
+    let us = get_time_us();
     let ts_ref = curr_translate_refmut(ts);
     ts_ref.sec = us / 1_000_000;
     ts_ref.usec = us % 1_000_000;
@@ -63,7 +63,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
     
     let ti_ref = curr_translate_refmut(ti);
-    ti_ref.time = get_current_running_time();
+    ti_ref.time = get_current_running_time(get_time_ms());
     ti_ref.status = TaskStatus::Running;
     let tong_syscalls_cnt = get_current_syscalls_cnt();
     for id in 0..CH4_SYSCALL_CNT {

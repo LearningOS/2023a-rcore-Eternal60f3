@@ -16,7 +16,7 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
-use crate::timer::get_time_us;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use crate::syscall::CH4_SYSCALL_CNT;
 use crate::mm::{translated_refmut, is_map_vpn, MapPermission, VirtAddr, VirtPageNum};
@@ -82,7 +82,7 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
-        next_task.start_time = get_time_us() as isize;
+        next_task.start_time = get_time_ms() as isize;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -145,7 +145,7 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             if inner.tasks[next].start_time < 0 {
-                inner.tasks[next].start_time = get_time_us() as isize;
+                inner.tasks[next].start_time = get_time_ms() as isize;
             }   
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
@@ -221,7 +221,7 @@ pub fn get_current_running_time() -> usize {
     let task_manager_inner = TASK_MANAGER.inner.exclusive_access();
     let curr_task = &task_manager_inner.tasks[task_manager_inner.current_task];
 
-    let now_time = get_time_us();
+    let now_time = get_time_ms();
     (now_time - curr_task.start_time as usize + 1000 - 1) / 1000
 }
 

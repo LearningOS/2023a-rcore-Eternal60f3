@@ -10,7 +10,7 @@ use crate::{
         suspend_current_and_run_next, TaskStatus, is_map_vpn_current, add_maparea,
         remove_mem,  curr_translate_refmut, get_current_running_time, get_current_syscalls_cnt,
     },
-    timer::get_time_us, syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL},
+    timer::get_time_ms, syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL},
 };
 
 #[repr(C)]
@@ -125,7 +125,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
         current_task().unwrap().pid.0
     );
 
-    let us = get_time_us();
+    let us = get_time_ms();
     let ts_ref = curr_translate_refmut(ts);
     ts_ref.sec = us / 1_000_000;
     ts_ref.usec = us % 1_000_000;
@@ -163,7 +163,7 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     }
 
     let start_va: VirtAddr = start.into();
-    let end_va: VirtAddr = (start + len).into();
+    let end_va: VirtAddr = (start + len - 1).into();
     
     let start_vpn: VirtPageNum = start_va.into();
     let end_vpn: VirtPageNum = end_va.ceil().into();
@@ -196,7 +196,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
     }
 
     let start_va: VirtAddr = start.into();
-    let end_va: VirtAddr = (start + len).into();
+    let end_va: VirtAddr = (start + len - 1).into();
     
     let start_vpn: VirtPageNum = start_va.into();
     let end_vpn: VirtPageNum = end_va.ceil().into();

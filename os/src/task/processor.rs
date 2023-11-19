@@ -10,7 +10,7 @@ use super::{TaskContext, TaskControlBlock};
 use crate::mm::{VirtPageNum, is_map_vpn, MapPermission, VirtAddr, translated_refmut};
 use crate::sync::UPSafeCell;
 use crate::syscall::CH5_SYSCALL_CNT;
-use crate::timer::get_time_us;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
@@ -69,7 +69,7 @@ pub fn run_tasks() {
             task_inner.task_status = TaskStatus::Running;
             task_inner.stride += BIG_STRIDER / task_inner.prio_level;
             if task_inner.start_time < 0 {
-                task_inner.start_time = get_time_us() as isize;
+                task_inner.start_time = get_time_ms() as isize;
             }
             // release coming task_inner manually
             drop(task_inner);
@@ -163,7 +163,7 @@ pub fn get_current_running_time() -> usize {
     let curr_task = current_task().unwrap();
     let task_inner = curr_task.inner_exclusive_access();
 
-    let now_time = get_time_us();
+    let now_time = get_time_ms();
     (now_time - task_inner.start_time as usize + 1000 - 1) / 1000
 }
 

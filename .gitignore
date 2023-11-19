@@ -18,5 +18,3 @@ pushall.sh
 
 user/
 ci-user/
-reports/
-.gitignore

@@ -45,7 +45,8 @@ pub fn sys_yield() -> isize {
 
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
-/// HINT: What if [`TimeVal`] is splitted by two pages ?
+/// HINT: What if [`TimeVal`] is splitted by two pages ? 
+/// 这里并没有解决这个问题，因为get_refmut并没有解决物理地址分页的情况
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
 

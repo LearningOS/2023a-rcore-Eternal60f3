@@ -19,7 +19,7 @@ use crate::sync::UPSafeCell;
 use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use crate::syscall::CH4_SYSCALL_CNT;
-use crate::mm::{translated_refmut, is_map_vpn, MapPermission};
+use crate::mm::{translated_refmut, is_map_vpn, MapPermission, VirtAddr, VirtPageNum};
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
@@ -145,7 +145,7 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             if inner.tasks[next].start_time < 0 {
-                inner.tasks[next].start_time = get_time_us();
+                inner.tasks[next].start_time = get_time_us() as isize;
             }   
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
@@ -219,7 +219,7 @@ pub fn curr_translate_refmut<T>(ptr: *mut T) -> &'static mut T {
 /// 获取当前进程运行时间 
 pub fn get_current_running_time() -> usize {
     let task_manager_inner = TASK_MANAGER.inner.exclusive_access();
-    let curr_task = task_manager_inner.tasks[task_manager_inner.current_task];
+    let curr_task = &task_manager_inner.tasks[task_manager_inner.current_task];
 
     let now_time = get_time_us();
     (now_time - curr_task.start_time as usize + 1000 - 1) / 1000
@@ -228,7 +228,7 @@ pub fn get_current_running_time() -> usize {
 /// 获取当前进程系统调用次数的桶
 pub fn get_current_syscalls_cnt() -> [usize; CH4_SYSCALL_CNT] {
     let task_manager_inner = TASK_MANAGER.inner.exclusive_access();
-    let curr_task = task_manager_inner.tasks[task_manager_inner.current_task];
+    let curr_task = &task_manager_inner.tasks[task_manager_inner.current_task];
 
     curr_task.tong_syscalls_cnt
 }
@@ -236,7 +236,8 @@ pub fn get_current_syscalls_cnt() -> [usize; CH4_SYSCALL_CNT] {
 /// 增加当前进程当前使用的系统调用的次数 
 pub fn add_current_syscall_cnt(curr_syscall_id: usize) {
     let mut task_manager_inner = TASK_MANAGER.inner.exclusive_access();
-    let curr_task = &mut task_manager_inner.tasks[task_manager_inner.current_task];
+    let curr_task_idx = task_manager_inner.current_task;
+    let curr_task = &mut task_manager_inner.tasks[curr_task_idx];
 
     let pair = curr_task.tong_syscalls_cnt
         .iter()
@@ -269,7 +270,8 @@ pub fn add_maparea(start_va: VirtAddr, end_va: VirtAddr, perm: usize) {
     }
 
     let mut task_manager_inner = TASK_MANAGER.inner.exclusive_access();
-    let curr_task = &mut task_manager_inner.tasks[task_manager_inner.current_task];
+    let curr_task_idx = task_manager_inner.current_task;
+    let curr_task = &mut task_manager_inner.tasks[curr_task_idx];
     curr_task.memory_set.insert_framed_area(start_va, end_va, permission);
 }
 
@@ -277,6 +279,7 @@ pub fn add_maparea(start_va: VirtAddr, end_va: VirtAddr, perm: usize) {
 ///     当前写法存在问题，只有当要删除的这段内存恰好和之前分配的某一段MapArea匹配时才会删除
 pub fn remove_mem(start_va: VirtAddr, end_va: VirtAddr) -> isize {
     let mut task_manager_inner = TASK_MANAGER.inner.exclusive_access();
-    let curr_task = &mut task_manager_inner.tasks[task_manager_inner.current_task];
+    let curr_task_idx = task_manager_inner.current_task;
+    let curr_task = &mut task_manager_inner.tasks[curr_task_idx];
     curr_task.memory_set.remove_area(start_va, end_va)
 }

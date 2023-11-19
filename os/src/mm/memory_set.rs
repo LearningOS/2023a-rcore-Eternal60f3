@@ -63,6 +63,7 @@ impl MemorySet {
             None,
         );
     }
+    /// 取消虚拟内存映射 
     pub fn remove_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
         let start_vpn = start_va.floor();
         let end_vpn = end_va.ceil();

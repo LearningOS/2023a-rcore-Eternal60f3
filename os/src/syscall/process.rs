@@ -1,14 +1,15 @@
 //! Process management syscalls
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
         curr_translate_refmut, get_current_running_time, get_current_syscalls_cnt, is_map_vpn_current,
-        remove_mem,
+        remove_mem, add_maparea,
     },
     timer::get_time_us,
-    mm::{translated_refmut, VirtAddr, VirtPageNum, StepByOne},
+    mm::{VirtAddr, VirtPageNum, StepByOne},
 };
+use super::{CH4_SYSCALL_CNT, TONG_MAP_SYSCALL};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -65,14 +66,14 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     ti_ref.time = get_current_running_time();
     ti_ref.status = TaskStatus::Running;
     let tong_syscalls_cnt = get_current_syscalls_cnt();
-    for id in 0..CH5_SYSCALL_CNT {
+    for id in 0..CH4_SYSCALL_CNT {
         ti_ref.syscall_times[TONG_MAP_SYSCALL[id]] = tong_syscalls_cnt[id] as u32;
     }
     0
 }
 
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!("kernel: sys_mmap");
     
     if start % PAGE_SIZE != 0 || (port & !0x7) != 0 || (port & 0x7) == 0 {
@@ -101,7 +102,7 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
+pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!("kernel: sys_munmap");
     
     if start % PAGE_SIZE != 0 {

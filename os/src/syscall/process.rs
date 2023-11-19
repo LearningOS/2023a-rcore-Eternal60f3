@@ -163,7 +163,7 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     }
 
     let start_va: VirtAddr = start.into();
-    let end_va: VirtAddr = (start + len - 1).into();
+    let end_va: VirtAddr = (start + len).into();
     
     let start_vpn: VirtPageNum = start_va.into();
     let end_vpn: VirtPageNum = end_va.ceil().into();
@@ -196,7 +196,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
     }
 
     let start_va: VirtAddr = start.into();
-    let end_va: VirtAddr = (start + len - 1).into();
+    let end_va: VirtAddr = (start + len).into();
     
     let start_vpn: VirtPageNum = start_va.into();
     let end_vpn: VirtPageNum = end_va.ceil().into();

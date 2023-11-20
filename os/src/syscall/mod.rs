@@ -40,6 +40,27 @@ const SYSCALL_SPAWN: usize = 400;
 /// taskinfo syscall
 const SYSCALL_TASK_INFO: usize = 410;
 
+/// CH5分支的syscall数量
+pub const CH5_SYSCALL_CNT: usize = 15;
+/// 对CH5的所有系统调用进行桶映射
+pub const TONG_MAP_SYSCALL: [usize; 15] = [
+    SYSCALL_EXEC,
+    SYSCALL_EXIT,
+    SYSCALL_FORK,
+    SYSCALL_GETPID,
+    SYSCALL_GET_TIME,
+    SYSCALL_MMAP,
+    SYSCALL_MUNMAP,
+    SYSCALL_READ,
+    SYSCALL_SBRK,
+    SYSCALL_SET_PRIORITY,
+    SYSCALL_SPAWN,
+    SYSCALL_TASK_INFO,
+    SYSCALL_WAITPID,
+    SYSCALL_WRITE,
+    SYSCALL_YIELD,
+];
+
 mod fs;
 mod process;
 

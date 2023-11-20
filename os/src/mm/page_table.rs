@@ -8,13 +8,21 @@ use bitflags::*;
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
+        /// v
         const V = 1 << 0;
+        /// r
         const R = 1 << 1;
+        /// w
         const W = 1 << 2;
+        /// x
         const X = 1 << 3;
+        /// u
         const U = 1 << 4;
+        /// g
         const G = 1 << 5;
+        /// a
         const A = 1 << 6;
+        /// d
         const D = 1 << 7;
     }
 }
@@ -212,4 +220,14 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         .translate_va(VirtAddr::from(va))
         .unwrap()
         .get_mut()
+}
+/// 判断某个ppn是否已经映射了
+pub fn is_map_vpn(token: usize, vpn: VirtPageNum) -> bool {
+    let page_table = PageTable::from_token(token);
+    match page_table.find_pte(vpn) {
+        Some(pte) => {
+            (pte.flags() & PTEFlags::U) != PTEFlags::empty()
+        }
+        None => false,
+    }
 }

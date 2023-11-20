@@ -7,16 +7,10 @@
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
-use crate::mm::{VirtPageNum, is_map_vpn, MapPermission, VirtAddr, translated_refmut};
 use crate::sync::UPSafeCell;
-use crate::syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL};
-use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
-
-/// 用于计算进程每一次运行后需要增加的pass
-const BIG_STRIDER: isize = 10000;
 
 /// Processor management structure
 pub struct Processor {
@@ -64,14 +58,9 @@ pub fn run_tasks() {
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
-            println!("now_task_pid: {}", task.pid.0);
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
-            task_inner.stride += BIG_STRIDER / task_inner.prio_level;
-            if task_inner.start_time < 0 {
-                task_inner.start_time = get_time_ms() as isize;
-            }
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
@@ -118,75 +107,5 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     drop(processor);
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
-    }
-}
-
-/// 在当前进程中判断某个虚拟页面是否已经映射了
-pub fn is_map_vpn_current(vpn: VirtPageNum) -> bool {
-    let token = current_user_token();
-    is_map_vpn(token, vpn)
-}
-
-/// 为当前进程增加一段内存(MapArea)
-pub fn add_maparea(start_va: VirtAddr, end_va: VirtAddr, perm: usize) {
-    let mut permission: MapPermission = MapPermission::U;
-    if (perm & (1 << 0)) != 0 {
-        permission.insert(MapPermission::R);
-    }
-    if (perm & (1 << 1)) != 0 {
-        permission.insert(MapPermission::W);
-    }
-    if (perm & (1 << 2)) != 0 {
-        permission.insert(MapPermission::X);
-    }
-
-    let curr_task = current_task().unwrap();
-    let mut task_inner = curr_task.inner_exclusive_access();
-    task_inner.memory_set.insert_framed_area(start_va, end_va, permission);
-}
-
-/// 删除当前进程中的一段内存
-///     当前写法存在问题，只有当要删除的这段内存恰好和之前分配的某一段MapArea匹配时才会删除
-pub fn remove_mem(start_va: VirtAddr, end_va: VirtAddr) -> isize {
-    let curr_task = current_task().unwrap();
-    let mut task_inner = curr_task.inner_exclusive_access();
-    task_inner.memory_set.remove_area(start_va, end_va)
-}
-
-/// 将当前进程的虚拟地址转换为物理地址
-pub fn curr_translate_refmut<T>(ptr: *mut T) -> &'static mut T {
-    let token = current_user_token();
-    translated_refmut(token, ptr)
-}
-
-/// 获取当前进程运行时间 
-pub fn get_current_running_time(now_time: usize) -> usize {
-    let curr_task = current_task().unwrap();
-    let task_inner = curr_task.inner_exclusive_access();
-
-    now_time - task_inner.start_time as usize + 100
-}
-
-/// 获取当前进程系统调用次数的桶
-pub fn get_current_syscalls_cnt() -> [usize; CH5_SYSCALL_CNT] {
-    let curr_task = current_task().unwrap();
-    let task_inner = curr_task.inner_exclusive_access();
-
-    task_inner.tong_syscalls_cnt
-}
-
-/// 增加当前进程当前使用的系统调用的次数 
-pub fn add_current_syscall_cnt(curr_syscall_id: usize) {
-    let curr_task = current_task().unwrap();
-    let mut task_inner = curr_task.inner_exclusive_access();
-
-    let pair = TONG_MAP_SYSCALL
-        .iter()
-        .enumerate()
-        .find(|(_, syscall_id)| {
-        **syscall_id == curr_syscall_id
-    });
-    if let Some((tong_id, _)) = pair {
-        task_inner.tong_syscalls_cnt[tong_id] += 1;
     }
 }

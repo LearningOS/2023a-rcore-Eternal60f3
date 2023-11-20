@@ -2,16 +2,13 @@
 use alloc::sync::Arc;
 
 use crate::{
-    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
+    config::MAX_SYSCALL_NUM,
     loader::get_app_data_by_name,
-    mm::{translated_refmut, translated_str, VirtPageNum, VirtAddr, StepByOne, },
+    mm::{translated_refmut, translated_str},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus, is_map_vpn_current, add_maparea,
-        remove_mem,  curr_translate_refmut, get_current_running_time, get_current_syscalls_cnt,
+        suspend_current_and_run_next, TaskStatus,
     },
-    timer::{get_time_ms, get_time_us},
-    syscall::{CH5_SYSCALL_CNT, TONG_MAP_SYSCALL},
 };
 
 #[repr(C)]
@@ -120,99 +117,41 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_get_time",
+        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-
-    let us = get_time_us();
-    let ts_ref = curr_translate_refmut(ts);
-    ts_ref.sec = us / 1_000_000;
-    ts_ref.usec = us % 1_000_000;
-    0
+    -1
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!(
-        "kernel:pid[{}] sys_task_info",
+        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    
-    let ti_ref = curr_translate_refmut(ti);
-    ti_ref.time = get_current_running_time(get_time_ms());
-    ti_ref.status = TaskStatus::Running;
-    let tong_syscalls_cnt = get_current_syscalls_cnt();
-    for id in 0..CH5_SYSCALL_CNT {
-        ti_ref.syscall_times[TONG_MAP_SYSCALL[id]] = tong_syscalls_cnt[id] as u32;
-    }
-    0
+    -1
 }
 
 /// YOUR JOB: Implement mmap.
-pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
+pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_mmap",
+        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    
-    if start % PAGE_SIZE != 0 || (port & !0x7) != 0 || (port & 0x7) == 0 {
-        return -1;
-    }
-
-    let start_va: VirtAddr = start.into();
-    let end_va: VirtAddr = (start + len).into();
-    
-    let start_vpn: VirtPageNum = start_va.into();
-    let end_vpn: VirtPageNum = end_va.ceil().into();
-    let mut curr_vpn:VirtPageNum = start_vpn;
-    loop {
-        if curr_vpn == end_vpn {
-            break;
-        }
-        if is_map_vpn_current(curr_vpn) {
-            return -1;
-        }
-        curr_vpn.step();
-    }
-
-    add_maparea(start_va, end_va, port);
-    // 对于物理内存不足的情况，就直接靠系统panic
-    0
+    -1
 }
 
 /// YOUR JOB: Implement munmap.
-///     当前写法存在问题，只有当要删除的这段内存恰好和之前分配的某一段MapArea匹配时才会删除
-pub fn sys_munmap(start: usize, len: usize) -> isize {
+pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_munmap",
+        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-
-    if start % PAGE_SIZE != 0 {
-        return -1;
-    }
-
-    let start_va: VirtAddr = start.into();
-    let end_va: VirtAddr = (start + len).into();
-    
-    let start_vpn: VirtPageNum = start_va.into();
-    let end_vpn: VirtPageNum = end_va.ceil().into();
-    let mut curr_vpn:VirtPageNum = start_vpn;
-    loop {
-        if curr_vpn == end_vpn {
-            break;
-        }
-        if !is_map_vpn_current(curr_vpn) {
-            return -1;
-        }
-        curr_vpn.step();
-    }
-
-    remove_mem(start_va, end_va)
+    -1
 }
 
 /// change data segment size
@@ -227,42 +166,19 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(path: *const u8) -> isize {
+pub fn sys_spawn(_path: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_spawn",
+        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    
-    let curr_task = current_task().unwrap();
-    let new_task = curr_task.fork();
-    let new_pid = &new_task.pid;
-
-    let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
-    trap_cx.x[10] = 0;
-    
-    let token = current_user_token();
-    let path = translated_str(token, path);
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
-        new_task.exec(data);
-        new_pid.0 as isize
-    } else {
-        -1
-    }
+    -1
 }
 
 // YOUR JOB: Set task priority.
-pub fn sys_set_priority(prio: isize) -> isize {
+pub fn sys_set_priority(_prio: isize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_set_priority",
+        "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-
-    if prio < 2 || prio > 16 {
-        return -1;
-    }
-    
-    let task = current_task().unwrap();
-    let mut task_inner = task.inner_exclusive_access();
-    task_inner.prio_level = prio;
-    prio
+    -1
 }

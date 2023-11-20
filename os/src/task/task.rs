@@ -5,7 +5,6 @@ use crate::config::TRAP_CONTEXT_BASE;
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
-use crate::syscall::CH5_SYSCALL_CNT;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::RefMut;
@@ -69,18 +68,6 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
-
-    /// 优先级
-    pub prio_level: isize,
-
-    /// 进程已运行的长度
-    pub stride: isize,
-
-    /// 进程开始运行的时间
-    pub start_time: isize, 
-
-    /// 当前进程使用的系统调用
-    pub tong_syscalls_cnt: [usize; CH5_SYSCALL_CNT],
 }
 
 impl TaskControlBlockInner {
@@ -131,10 +118,6 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
-                    prio_level: 16,
-                    stride: 0,
-                    start_time: -1,
-                    tong_syscalls_cnt: [0; CH5_SYSCALL_CNT],
                 })
             },
         };
@@ -167,14 +150,6 @@ impl TaskControlBlock {
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize base_size
         inner.base_size = user_sp;
-        // 初始化优先级
-        inner.prio_level = 16;
-        // 初始化stride
-        inner.stride = 0;
-        // 初始化时间
-        inner.start_time = -1;
-        // 初始化系统调用
-        inner.tong_syscalls_cnt = [0; CH5_SYSCALL_CNT];
         // initialize trap_cx
         let trap_cx = inner.get_trap_cx();
         *trap_cx = TrapContext::app_init_context(
@@ -216,10 +191,6 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
-                    prio_level: parent_inner.prio_level,
-                    stride: parent_inner.stride,
-                    start_time: -1,
-                    tong_syscalls_cnt: [0; CH5_SYSCALL_CNT],
                 })
             },
         });
